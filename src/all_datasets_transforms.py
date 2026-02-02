@@ -1,4 +1,4 @@
-# all_datasets_transforms.py - Functions used when finetuning model trained on Wu data
+# all_datasets_transforms.py - Functions used for pretraining and finetuning
 
 # --- Setup ---
 
