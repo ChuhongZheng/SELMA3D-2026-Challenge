@@ -29,8 +29,12 @@ from pytorch_lightning.loggers import WandbLogger
 sys.path.append('/home/ads4015/ssl_project/models')
 from binary_segmentation_module import BinarySegmentationModule
 
-sys.path.append('/home/ads4015/ssl_project/data')
-from nifti_pair_dataset import NiftiPairDataset
+# sys.path.append('/home/ads4015/ssl_project/data')
+# from nifti_pair_dataset import NiftiPairDataset
+
+# finetune transforms
+sys.path.append("/home/ads4015/ssl_project/src")
+from all_datasets_transforms import get_finetune_train_transforms, get_finetune_val_transforms
 
 # set matmul precision
 torch.set_float32_matmul_precision('medium')
@@ -67,6 +71,45 @@ def _seed_worker(_):
 class Pair:
     image: Path
     label: Path
+
+
+class NiftiPairDictDataset(Dataset):
+    """
+    NIfTI pairs -> dict for MONAI dict transforms.
+    Returns:
+      image: (1, D, H, W) float32
+      label: (1, D, H, W) float32 binary
+      filename: str
+    NOTE: We do NOT do percentile normalization here because your finetune
+    transforms already apply ScaleIntensityRangePercentilesd.
+    """
+    def __init__(self, pairs, transform=None):
+        self.pairs = list(pairs)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.pairs)
+
+    def __getitem__(self, idx):
+        p = self.pairs[idx]
+
+        img = nib.load(str(p.image)).get_fdata().astype(np.float32)
+        lbl = nib.load(str(p.label)).get_fdata().astype(np.float32)
+
+        # handle trailing singleton channel dim: (D,H,W,1) -> (D,H,W)
+        if img.ndim == 4 and img.shape[-1] == 1:
+            img = img[..., 0]
+        if lbl.ndim == 4 and lbl.shape[-1] == 1:
+            lbl = lbl[..., 0]
+
+        # channel-first: (1,D,H,W)
+        img = img[None, ...]
+        lbl = (lbl[None, ...] > 0.5).astype(np.float32)
+
+        d = {"image": img, "label": lbl, "filename": str(p.image)}
+        if self.transform is not None:
+            d = self.transform(d)
+        return d
 
 
 # function to get all image-label pairs in a class folder
@@ -358,17 +401,21 @@ def run_for_subtype(subtype_dir, args, device):
         print(f'[WARN] {subtype}: Not enough finetune data after train/val split (train: {len(train_core)}, val: {len(val_pairs)}), skipping finetuning', flush=True)
         return RunOutputs(best_ckpt='', metrics_csv=Path(''), preds_dir=Path(''))
 
+    # transforms
+    train_tf = get_finetune_train_transforms()
+    val_tf = get_finetune_val_transforms()
+
     # test set (never seen during model selection)
-    test_dataset = NiftiPairDataset(eval_pairs, augment=False)
+    test_dataset = NiftiPairDictDataset(eval_pairs, transform=val_tf)
     num_workers = min(args.num_workers, os.cpu_count() or args.num_workers)
     # persistent_workers=False helps prevent leaked semaphores on teardown
     loader_kw = dict(num_workers=num_workers, pin_memory=torch.cuda.is_available(), persistent_workers=False, worker_init_fn=_seed_worker)
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, **loader_kw)
 
-    train_dataset = NiftiPairDataset(train_core, augment=True)
+    train_dataset = NiftiPairDictDataset(train_core, transform=train_tf)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, **loader_kw)
     
-    val_dataset = NiftiPairDataset(val_pairs, augment=False)
+    val_dataset = NiftiPairDictDataset(val_pairs, transform=val_tf)
     val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, **loader_kw)
 
     # tagging and logging
