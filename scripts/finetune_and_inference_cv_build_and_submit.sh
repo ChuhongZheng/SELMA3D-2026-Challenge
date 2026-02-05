@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=build_submit_ft_cv
-#SBATCH --output=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long/logs/build_submit_ft_cv_%j.out
-#SBATCH --error=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long/logs/build_submit_ft_cv_%j.err
+#SBATCH --output=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long_v3/logs/build_submit_ft_cv_%j.out
+#SBATCH --error=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long_v3/logs/build_submit_ft_cv_%j.err
 #SBATCH --partition=minilab-cpu
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=4G
@@ -26,7 +26,7 @@ mkdir -p "$TMPDIR"
 
 # config
 ROOT="/midtier/paetzollab/scratch/ads4015/data_selma3d/selma3d_finetune_patches"
-OUTDIR="/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long/cv_folds" # output dir for folds jsons and tasks file
+OUTDIR="/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long_v3/cv_folds" # output dir for folds jsons and tasks file
 REPEATS=3
 SEED=100
 CHANNELS="ALL"
@@ -37,14 +37,17 @@ MAX_CONCURRENT="" # array concurrency cap (set to "" for no cap, set to e.g. "3"
 
 # sweep counts per subtype
 declare -A COUNTS
-COUNTS[amyloid_plaque_patches]="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19"
-COUNTS[c_fos_positive_patches]="1 2 3 4"
-COUNTS[cell_nucleus_patches]="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25"
-COUNTS[vessels_patches]="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20"
+# COUNTS[amyloid_plaque_patches]="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19"
+# COUNTS[c_fos_positive_patches]="1 2 3 4"
+# COUNTS[cell_nucleus_patches]="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25"
+# COUNTS[vessels_patches]="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20"
+COUNTS[amyloid_plaque_patches]="5 15"
+COUNTS[cell_nucleus_patches]="5 15"
+COUNTS[vessels_patches]="5 15"
 
 # load conda env
 module load anaconda3/2022.10-34zllqw
-source activate monai-env1
+source activate monai-env2
 
 # prepare output dirs and tasks file
 mkdir -p "$OUTDIR"

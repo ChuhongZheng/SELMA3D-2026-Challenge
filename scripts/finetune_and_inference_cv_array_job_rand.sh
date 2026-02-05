@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=finetune_infer_cv_array_rand
-#SBATCH --output=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_rand_v2/logs/finetune_infer_cv_array_rand_%A_%a.out
-#SBATCH --error=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_rand_v2/logs/finetune_infer_cv_array_rand_%A_%a.err
+#SBATCH --output=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_rand_v3/logs/finetune_infer_cv_array_rand_%A_%a.out
+#SBATCH --error=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_rand_v3/logs/finetune_infer_cv_array_rand_%A_%a.err
 #SBATCH --partition=minilab-gpu
-#SBATCH --gres=gpu:l40:1
+#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=128G
 #SBATCH --time=48:00:00
@@ -31,13 +31,13 @@ echo "[INFO] Folds JSON: $FJSON"
 
 # load conda env
 module load anaconda3/2022.10-34zllqw
-source activate monai-env1
+source activate monai-env2
 
 # define constants
 ROOT="/midtier/paetzollab/scratch/ads4015/data_selma3d/selma3d_finetune_patches"
-CKPT_DIR="/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_rand_v2/checkpoints" # output dir for finetune checkpoints
+CKPT_DIR="/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_rand_v3/checkpoints" # output dir for finetune checkpoints
 # CKPT=""
-PRED_ROOT="/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_rand_v2/preds" # output dir for preds
+PRED_ROOT="/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_rand_v3/preds" # output dir for preds
 
 # pretty-name mapping for outputs
 case "$SUBTYPE" in
@@ -73,6 +73,9 @@ python /home/ads4015/ssl_project/src/finetune_and_inference_split.py \
   --fold_id "$FID" \
   --train_limit "$K"
 
+
+# optional: best-effort cleanup (ignore failure)
+rm -rf "$TMPDIR" || true
 
 # indicate done
 echo "[INFO] Done: ${SUBTYPE} (K=${K}, FID=${FID})"

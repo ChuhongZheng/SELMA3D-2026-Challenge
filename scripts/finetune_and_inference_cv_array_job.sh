@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=finetune_infer_cv_array
-#SBATCH --output=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long/logs/finetune_infer_cv_array_%A_%a.out
-#SBATCH --error=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long/logs/finetune_infer_cv_array_%A_%a.err
+#SBATCH --output=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long_v3/logs/finetune_infer_cv_array_%A_%a.out
+#SBATCH --error=/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long_v3/logs/finetune_infer_cv_array_%A_%a.err
 #SBATCH --partition=minilab-gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=128G
-#SBATCH --time=7-00:00:00
+#SBATCH --time=3-00:00:00
 
 # finetune_and_inference_cv_array_job.sh - Script to finetune a pretrained model and perform inference on a dataset split into training and evaluation sets, using SLURM array jobs.
 # one array task = one (SUBTYPE, K, FID, FJSON) job.
@@ -45,16 +45,14 @@ echo "[INFO] Folds JSON: $FJSON"
 
 # load conda env
 module load anaconda3/2022.10-34zllqw
-source activate monai-env1
+source activate monai-env2
 
 # define constants
 ROOT="/midtier/paetzollab/scratch/ads4015/data_selma3d/selma3d_finetune_patches"
-CKPT_DIR="/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long/checkpoints" # output dir for finetune checkpoints
-# CKPT="/ministorage/adina/pretrain_sweep_no_clip/checkpoints/r605gzgj/all_datasets_pretrained_no_clip-epochepoch=183-valval_loss=0.0201-stepstep=10672.ckpt" # checkpoint with no CLIP
-# CKPT="/ministorage/adina/pretrain_sweep_updated/checkpoints/kjvlrs45/all_datasets_clip_pretrained-updated-epochepoch=354-val-reportval_loss_report=0.0968-stepstep=20590.ckpt"
+CKPT_DIR="/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long_v3/checkpoints" # output dir for finetune checkpoints
 # CKPT="/midtier/paetzollab/scratch/ads4015/checkpoints/autumn_sweep_27/all_datasets_clip_pretrained-updated-epochepoch=354-val-reportval_loss_report=0.0968-stepstep=20590.ckpt" # checkpoint from autumn_sweep_27
 CKPT="/midtier/paetzollab/scratch/ads4015/model_checkpoints/ibot_clip_pretrain_lsm_all_long/last.ckpt" # Image+CLIP overtrained checkpoint
-PRED_ROOT="/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long/preds" # output dir for preds
+PRED_ROOT="/midtier/paetzollab/scratch/ads4015/temp_selma_segmentation_preds_autumn_sweep_27_long_v3/preds" # output dir for preds
 
 # pretty-name mapping for outputs
 case "$SUBTYPE" in
@@ -80,7 +78,6 @@ python /home/ads4015/ssl_project/src/finetune_and_inference_split.py \
   --batch_size 4 \
   --feature_size 36 \
   --max_epochs 1000 \
-  --early_stopping_patience 1000 \
   --freeze_encoder_epochs 5 \
   --encoder_lr_mult 0.05 \
   --loss_name dicece \
@@ -91,7 +88,8 @@ python /home/ads4015/ssl_project/src/finetune_and_inference_split.py \
   --preds_subtype "$PRETTY_SUBTYPE" \
   --folds_json "$FJSON" \
   --fold_id "$FID" \
-  --train_limit "$K"
+  --train_limit "$K" \
+  --infer_ckpt last
 
 
 # optional: best-effort cleanup (ignore failure)
