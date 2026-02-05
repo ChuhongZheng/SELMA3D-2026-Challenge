@@ -396,7 +396,12 @@ def run_for_subtype(subtype_dir, args, device):
     # train
     # model checkpoint callback
     model_ckpt = ModelCheckpoint(
-        monitor='val_dice_050', mode='max', save_top_k=1, dirpath=str(ckpt_dir), filename='finetune_split_best'
+        monitor='val_dice_050', 
+        mode='max', 
+        save_top_k=1, 
+        save_last=True,
+        dirpath=str(ckpt_dir), 
+        filename='finetune_split_best'
     )
 
     # early stopping callback
@@ -417,14 +422,25 @@ def run_for_subtype(subtype_dir, args, device):
     )
     trainer.fit(model, train_loader, val_loader)
 
-    # resolve best checkpoint path or fallback to last ckpt
+    # --- resolve checkpoint paths ---
     best_ckpt = model_ckpt.best_model_path or (model.best_ckpt or '')
-    if not best_ckpt:
-        best_ckpt = str(ckpt_dir / 'finetune_split_last.ckpt')
-        trainer.save_checkpoint(best_ckpt)
+    last_ckpt = str(ckpt_dir / 'last.ckpt')  # produced by save_last=True
 
-    # load best model for eval
-    best_model = BinarySegmentationModule.load_from_checkpoint(best_ckpt).to(device).eval()
+    # safety: ensure last exists
+    if not os.path.exists(last_ckpt):
+        trainer.save_checkpoint(last_ckpt)
+
+    # safety: if best didn't get produced for some reason, fall back to last
+    if not best_ckpt or not os.path.exists(best_ckpt):
+        best_ckpt = last_ckpt
+        print(f'[WARN] {subtype}: Best checkpoint not found, falling back to last checkpoint: {best_ckpt}', flush=True)
+
+    # choose checkpoint for inference
+    infer_ckpt = best_ckpt if args.infer_ckpt == 'best' else last_ckpt
+    print(f'[INFO] {subtype}: Using infer_ckpt={infer_ckpt} (infer_ckpt flag = {args.infer_ckpt})', flush=True)
+
+    # load chosen model for eval/inference
+    infer_model = BinarySegmentationModule.load_from_checkpoint(infer_ckpt).to(device).eval()
 
 
     # choose output root (pred_root if provided, else fallback to data root)
@@ -443,7 +459,7 @@ def run_for_subtype(subtype_dir, args, device):
         fname = Path(batch['filename'][0])
 
         # logits and probabilities
-        logits = predict_logits(best_model, x)  # (1, 1, D, H, W)
+        logits = predict_logits(infer_model, x)  # (1, 1, D, H, W)
         probs = torch.sigmoid(logits) # (1, 1, D, H, W)
         dice_050 = dice_at_threshold(logits, y, threshold=0.5)
 
@@ -551,6 +567,9 @@ def parse_args():
     parser.add_argument('--folds_json', type=str, default=None, help='Path to JSON file defining cross-validation folds (default: None)')
     parser.add_argument('--fold_id', type=int, default=None, help='Fold ID to use from folds_json (0-based index, default: None)')
     parser.add_argument('--train_limit', type=int, default=None, help='Limit the number of training samples to this number (default: None, meaning no limit)')
+
+    # inference checkpoint selection
+    parser.add_argument('--infer_ckpt', type=str, choices=['best', 'last'], default='best', help='Which checkpoint to use for inference: "best" (default) or "last"')
 
     # parse
     args = parser.parse_args()
